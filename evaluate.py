@@ -12,7 +12,7 @@ from langchain_openai.chat_models import ChatOpenAI
 from dotenv import load_dotenv
 
 
-from scorers import BEMScorer     # reuse shared implementation
+from scorers import BEMScorer     
 
 
 load_dotenv()
