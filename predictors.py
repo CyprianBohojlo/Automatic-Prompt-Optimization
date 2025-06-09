@@ -62,7 +62,7 @@ class QA_Generator(GPT4Predictor):
     def __init__(self, opt=None):
         super().__init__(opt)
         self.top_k = self.opt.get("top_k", 3)
-        self.retrievers = {}           # doc_name → retriever
+        self.retrievers = {}           
         self.lock = threading.Lock() 
 
     def get_retriever(self, doc_name):
