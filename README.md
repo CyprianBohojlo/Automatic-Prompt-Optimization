@@ -48,7 +48,7 @@
 
 **Seed prompt template**
 
-# Task
+Task:
 Answer the question using the context.
 If the context does not contain the answer, reply "I can't answer the question based on the context".
 
