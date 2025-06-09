@@ -1,7 +1,4 @@
-"""
-Load the two FinanceBench JSONL files, merge them, keep the
-OPEN_SOURCE split and save to a feather/parquet file for fast reuse.
-"""
+
 import pathlib, pandas as pd
 
 ROOT = pathlib.Path(
