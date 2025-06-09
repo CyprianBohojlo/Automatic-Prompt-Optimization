@@ -1,13 +1,4 @@
-"""
-evaluate.py  – FinanceBench ProTeGi fork
-----------------------------------------
-Grades model answers into:
-  • "CORRECT"
-  • "INCORRECT"
-  • "REFUSED"
 
-Choose the judge with --metric {gpt|bem}
-"""
 
 import argparse, json, os, sys, pathlib
 from collections import Counter
@@ -20,23 +11,16 @@ from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from langchain_openai.chat_models import ChatOpenAI
 from dotenv import load_dotenv
 
-# ----------------------------------------------------------------------
-# LOCAL IMPORTS
-# ----------------------------------------------------------------------
+
 from scorers import BEMScorer     # reuse shared implementation
 
-# ----------------------------------------------------------------------
-# CONFIG PATHS
-# ----------------------------------------------------------------------
+
 load_dotenv()
 
 ROOT     = pathlib.Path(r"C:\Users\cypri\OneDrive\Desktop\Master Thesis")
 ANSWERS  = ROOT / "results" / "answers.jsonl"
 GRADES   = ROOT / "results" / "grades_ce.jsonl"
 
-# ----------------------------------------------------------------------
-# CLI
-# ----------------------------------------------------------------------
 def get_args():
     p = argparse.ArgumentParser("Grade FinanceBench answers")
     p.add_argument("--metric", choices=["gpt", "bem", "checkembed"], default="gpt",
@@ -45,9 +29,7 @@ def get_args():
                    help="BEM equivalence probability threshold.")
     return p.parse_args()
 
-# ----------------------------------------------------------------------
-# GPT-BASED JUDGE
-# ----------------------------------------------------------------------
+
 judge = ChatOpenAI(model_name="gpt-4o-mini", temperature=0, max_tokens=64)
 SYS = (
     "You are a strict grader.\n"
@@ -69,9 +51,7 @@ def verdict_gpt(question: str, gold: str, cand: str) -> str:
         return "REFUSED"
     return "INCORRECT"
 
-# ----------------------------------------------------------------------
-# BEM-BASED JUDGE
-# ----------------------------------------------------------------------
+
 bem_judge = BEMScorer(None)
 
 def verdict_bem(question: str, gold: str, cand: str, tau: float) -> str:
@@ -84,15 +64,13 @@ def verdict_bem(question: str, gold: str, cand: str, tau: float) -> str:
 
 
 
-# ----------------------------------------------------------------------
-# MAIN
-# ----------------------------------------------------------------------
+
 def main():
     args = get_args()
     if not ANSWERS.exists():
         sys.exit("Run generate.py first to produce answers.jsonl.")
 
-    # ---------- progress bar total -----------------------------------
+  
     total_qas = sum(1 for _ in ANSWERS.open("r", encoding="utf-8"))
 
     graded = []
@@ -108,7 +86,7 @@ def main():
             graded.append({**rec, "verdict": v})
             pbar.update(1)
 
-    # ---------- write grades -----------------------------------------
+   
     GRADES.parent.mkdir(parents=True, exist_ok=True)
     with GRADES.open("w", encoding="utf-8") as fout:
         for g in graded:
@@ -116,7 +94,7 @@ def main():
 
     counts = Counter(g["verdict"] for g in graded)
 
-    # ---------- bar plot ---------------------------------------------
+  
     labels = ["CORRECT", "INCORRECT", "REFUSED"]
     values = [counts.get(l, 0) for l in labels]
     plt.figure(figsize=(6, 4))
