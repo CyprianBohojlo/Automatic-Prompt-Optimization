@@ -1,8 +1,4 @@
-"""
-Functions kept: get_model · get_answer
-Uses only singleStore path
-Writes results/answers.jsonl
-"""
+
 import json, pathlib, sys
 from tqdm import tqdm
 from dotenv import load_dotenv
