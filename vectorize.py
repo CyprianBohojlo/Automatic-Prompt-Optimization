@@ -1,7 +1,4 @@
-"""
-Functions: get_pdf_text  |  build_vectorstore_retriever
-Exactly like notebook but keeps ONLY 'singleStore' mode.
-"""
+
 import os, pathlib, requests, sys
 from tqdm import tqdm
 from dotenv import load_dotenv
@@ -16,7 +13,7 @@ from langchain_openai.embeddings import OpenAIEmbeddings
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 
-# ---------------------------------------------------------------------
+
 ROOT    = pathlib.Path(r"C:\Users\cypri\OneDrive\Desktop\Master Thesis")
 DATASET = ROOT / "data" / "dataset_prepared.parquet"
 PATH_PDFS = ROOT / "pdfs";            PATH_PDFS.mkdir(exist_ok=True)
@@ -26,7 +23,7 @@ VS_CHUNK_SIZE      = 1024
 VS_CHUNK_OVERLAP   = 30
 EMBEDDINGS         = HuggingFaceEmbeddings(model_name="intfloat/e5-small-v2")
 GH_RAW             = "https://raw.githubusercontent.com/patronus-ai/financebench/main/pdfs"
-# ---------------------------------------------------------------------
+
 
 def get_pdf_text(doc_name: str):
     path_doc = PATH_PDFS / f"{doc_name}.pdf"
