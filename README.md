@@ -7,7 +7,7 @@
 | `optimizers.py`   | `ProTeGi` class: textual-gradient generation, MC paraphrases, beam search     .                                 |
 | `evaluators.py`   | UCB, Successive Rejects, Successive Halving, brute-force evaluators.                                            |
 | `predictors.py`   | `QA_Generator`: retrieves k chunks, fills the prompt, calls OpenAI chat.                                        |
-| `scorers.py`      | `BEMScorer` (TF-Hub) + caching infrastructure.                                                                  |
+| `scorers.py`      | `BEMScorer` and cache system.                                                                                   |
 | `tasks.py`        | `FinanceBenchTask`: dataset splits into training/testing, BEM-driven evaluation helper.                         |
 | `utils.py`        | OpenAI REST helper and prompt-section parser.                                                                   |
 | `generate.py`     | Use the best prompt produced by the ProTeGi search to answer FinanceBench questions                             |
