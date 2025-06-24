@@ -141,15 +141,6 @@ class ProTeGi(PromptOptimizer):
             new_task_sections = []
             if self.opt["n_gradients"] > 0:
                 gradients = self.get_gradients(prompt, task_section, minibatch, preds)
-                    # ---- DEBUG #1: print out what the LLM said went wrong ----
-                logger.debug(">>> GRADIENTS RETURNED:")
-                for idx, (feedback, err_str) in enumerate(gradients, start=1):
-                    # precompute the escaped version
-                    fb = feedback.replace('\n', '\\n')
-                    es = err_str.replace('\n', '\\n')
-                    logger.debug(f"Gradient {idx} feedback={fb}")
-                    logger.debug(f"Gradient {idx} err_str ={es}")
-                logger.debug(">>> end gradients")
                 for feedback, err_str in gradients:
                     tmp = self.apply_gradient(task_section, err_str, feedback, self.opt["steps_per_gradient"])
                     new_task_sections += tmp
@@ -158,18 +149,7 @@ class ProTeGi(PromptOptimizer):
             mc_sampled = []
             if self.opt["mc_samples_per_step"] > 0:
                 for sect in tqdm(new_task_sections + [task_section], desc='mc samples'):
-                    #mc_sampled += self.generate_synonyms(sect, n=self.opt["mc_samples_per_step"])
-
-                    syns = self.generate_synonyms(sect, n=self.opt["mc_samples_per_step"])
-                    mc_sampled += syns
-
-                    # ---- DEBUG #2: print out the paraphrases you got ----
-                    sec = sect.replace('\n','\\n')
-                    logger.debug(f"<<< MC PARAPHRASES for section: {sec}")
-                    for i, s in enumerate(syns,1):
-                        syn = s.replace('\n','\\n')
-                        logger.debug(f"   Synonym {i}: {syn}")
-                    logger.debug(">>> end MC paraphrases")
+                    mc_sampled += self.generate_synonyms(sect, n=self.opt["mc_samples_per_step"])
 
             # combine
             new_sections = list(set(new_task_sections + mc_sampled))
@@ -198,17 +178,6 @@ class ProTeGi(PromptOptimizer):
                 return "\n".join(lines[:start] + new_task_lines + lines[end:])
 
             tmp_prompts = [ rebuild(prompt, s) for s in new_sections ]
-
-            # ---- DEBUG: dump out each new candidate’s Task section ----
-            logger.debug(f"=== expand_candidates (prompt #{prompts.index(prompt)+1}) ===")
-            ts_escaped = task_section.replace('\n','\\n')
-            logger.debug(f"Seed Task section: {ts_escaped}")
-            logger.debug(f"Produced {len(tmp_prompts)} candidates.")
-            for i, cand in enumerate(tmp_prompts, start=1):
-                sects = utils.parse_sectioned_prompt(cand)
-                ts    = sects.get("task","").replace("\n","\\n")
-                logger.debug(f"[{i:2d}] TASK: {ts}")
-            logger.debug("=== end expand debug ===")
 
             # optional filtering (the original much longer code but with BEM it woul me the call much more costly)
             if len(tmp_prompts) > self.opt["max_expansion_factor"]:
