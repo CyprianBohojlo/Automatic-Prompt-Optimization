@@ -5,33 +5,6 @@ import utils
 
 
 
-
-# LOGGER
-
-import logging
-import os
-
-# create a logger for this module
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-
-# ensure output directory exists
-out_dir = os.path.dirname(os.environ.get("PROTEGI_DEBUG_LOG", "")) or "."
-os.makedirs(out_dir, exist_ok=True)
-
-# file handler writes debug logs here
-log_path = os.path.join(out_dir, "expand_debug.log")
-fh = logging.FileHandler(log_path, mode="w", encoding="utf-8")
-fh.setLevel(logging.DEBUG)
-
-# nice timestamped format
-formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
-fh.setFormatter(formatter)
-
-# attach to our logger
-logger.addHandler(fh)
-
-
 class PromptOptimizer(ABC):
     def __init__(self, args, evaluator_fn, scorer, max_threads=1, bf_eval=None):
         self.opt = args
