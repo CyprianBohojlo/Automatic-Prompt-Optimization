@@ -5,7 +5,8 @@
 | `prepare_data.py` | Merge FinanceBench JSONs, return `dataset_prepared.parquet`.                                                    |
 | `vectorize.py`    | Downloads the PDFs from the FinanceBench github repo and creates Chroma vector stores .                         |
 | `optimizers.py`   | `ProTeGi` class: textual-gradient generation, MC paraphrases, beam search     .                                 |
-| `evaluators.py`   | UCB, Successive Rejects, Successive Halving, brute-force evaluators.                                            |
+| `evaluators.py`   | UCB, Successive Rejects, Successive Halving, brute-force, PPO evaluators.                                       |
+| `PPO.py`          | PPO evaluator that can be used in evaluators.py                                                                 |
 | `predictors.py`   | `QA_Generator`: retrieves k chunks, fills the prompt, calls OpenAI chat.                                        |
 | `scorers.py`      | `BEMScorer` and cache system.                                                                                   |
 | `tasks.py`        | `FinanceBenchTask`: dataset splits into training/testing, BEM-driven evaluation helper.                         |
