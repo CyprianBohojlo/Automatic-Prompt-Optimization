@@ -49,16 +49,19 @@
 
 **Seed prompt template**
 
-Task:
-Answer the question using the context.
-If the context does not contain the answer, reply "I can't answer the question based on the context".
+# Task
+You are a financial QA assistant.  
+Answer the question using only the information in the context.  
 
-Context:
-{context}
+# Output format
+Return your answer as free text. If it’s a number, just output the number (don’t wrap in words). Otherwise, output a concise sentence.
 
-Q: {question}
-A:
+# Prediction
+Context: {context}
 
+Question: {question}
+
+Answer:
 
 
 
