@@ -3,8 +3,8 @@ import concurrent.futures
 from abc import ABC, abstractmethod
 from typing import List, Dict
 
-import utils                      # original OpenAI wrapper
-import vectorize                  # builds the Chroma retriever
+import utils                     
+import vectorize                  # builds the retriever
 import threading
 
 
@@ -62,15 +62,15 @@ class QA_Generator(GPT4Predictor):
     def __init__(self, opt=None):
         super().__init__(opt)
         self.top_k = self.opt.get("top_k", 3)
-        self.retrievers = {}           # doc_name → retriever
+        self.retrievers = {}           # doc_name to retriever
         self.lock = threading.Lock() 
 
     def get_retriever(self, doc_name):
-        if doc_name in self.retrievers:          # fast path
+        if doc_name in self.retrievers:         
             return self.retrievers[doc_name]
 
-        with self.lock:                          # first builder wins
-            if doc_name not in self.retrievers:  # 2nd check inside lock
+        with self.lock:                          
+            if doc_name not in self.retrievers:  # check inside lock
                 r = vectorize.build_vectorstore_retriever(doc_name)
                 r.search_kwargs["k"] = self.top_k
                 self.retrievers[doc_name] = r
