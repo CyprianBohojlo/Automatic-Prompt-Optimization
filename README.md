@@ -14,6 +14,7 @@
 | `generate.py`     | Use the best prompt produced by the ProTeGi search to answer FinanceBench questions                             |
 | `evaluate.py`     | Grades the answers with either LLM-based judge or BEM                                                           |
 | `main.py`         | Main file that launches the ProTeGi search loop.                                                                |
+| `test_seed.txt`   | Seed prompt that must be used as one of the arguemnts when running main.py. Can be replaced with other prompt.  |
 
 
 **Workflow**
@@ -44,24 +45,4 @@
 | `--top_k`                  | How many top-scoring prompts to consider when selecting the best one.                                        |
 | `--n_test_exs`             | Limits the number of test examples used during development (useful for faster debugging).                    |
 | '--max_hreads'             | Maximum number of things (e.g. prompts or examples) processed at the same time. Higher is faster (e.g. for cluster). |
-
-
-
-**Seed prompt template**
-
-# Task
-You are a financial QA assistant.  
-Answer the question using only the information in the context.  
-
-# Output format
-Return your answer as free text. If it’s a number, just output the number (don’t wrap in words). Otherwise, output a concise sentence.
-
-# Prediction
-Context: {context}
-
-Question: {question}
-
-Answer:
-
-
 
