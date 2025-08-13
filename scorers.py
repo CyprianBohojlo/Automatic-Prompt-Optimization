@@ -22,12 +22,12 @@ BEM_TAG = "google/bert/tensorFlow2/answer-equivalence-bem"
 def load_bem():
     base_dir = kagglehub.model_download(BEM_TAG)
 
-    # 1️⃣ first try the cache root
+    # first try the cache root
     root_pb = os.path.join(base_dir, "saved_model.pb")
     if os.path.exists(root_pb):
         return tf.saved_model.load(base_dir)
 
-    # 2️⃣ otherwise fall back to a nested “model/” folder (old layout)
+    # otherwise go back to a nested “model/” folder 
     nested_dir = os.path.join(base_dir, "model")
     if os.path.exists(os.path.join(nested_dir, "saved_model.pb")):
         return tf.saved_model.load(nested_dir)
@@ -44,10 +44,10 @@ BEM_threshold   = 0.56
 
 
 def predict_on_example(inputs):
-    """
-    Worker helper for concurrent evaluation.
-    Returns: (prompt_text, example_dict, LLM_prediction_string)
-    """
+    
+    # Worker helper for concurrent evaluation.
+    # Returns: (prompt_text, example_dict, LLM_prediction_string)
+    
     ex, predictor, prompt = inputs
     pred = predictor.inference(ex, prompt)
     return prompt, ex, pred
@@ -55,10 +55,9 @@ def predict_on_example(inputs):
 
 
 class BaseScorer(ABC):
-    """
-    Implements a prompt-hash and example-id, prediction cache so the
-    optimiser never calls the LLM twice for the same pair.
-    """
+    
+    # Implements a prompt-hash and example-id, prediction cache so the optimiser never calls the LLM twice for the same pair
+    
 
     def __init__(self, predictor):
         self.predictor = predictor
@@ -134,3 +133,4 @@ class BEMScorer(BaseScorer):
             for p, ex in zip(preds, examples)
         ]
         return float(np.mean(hits))
+
