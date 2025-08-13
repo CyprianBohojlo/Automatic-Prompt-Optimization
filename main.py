@@ -5,7 +5,7 @@ import optimizers
 from tasks      import get_task
 from predictors import QA_Generator
 from scorers    import BEMScorer
-from evaluators import get_evaluator, PPOEvaluator  
+from evaluators import get_evaluator, PPOEvaluator, DPOEvaluator
 
 
 def parse_args():
@@ -22,18 +22,35 @@ def parse_args():
     p.add_argument("--eval_prompts_per_round", type=int, default=10)
     p.add_argument("--samples_per_eval", type=int, default=5)
     p.add_argument("--evaluator",
-                   choices=["ucb", "ucb-e", "sr", "s-sr", "sh", "bf", "ppo"],
+                   choices=["ucb", "ucb-e", "sr", "s-sr", "sh", "bf", "ppo", "dpo"],
                    default="ucb")
     # model options
     p.add_argument("--temperature", type=float, default=0.0)
     p.add_argument("--top_k", type=int, default=3)
     p.add_argument("--max_threads", type=int, default=4)
     p.add_argument("--n_test_exs", type=int, default=None)
+
+    # PPO-specific options (ignored unless --evaluator ppo)
     p.add_argument("--ppo_hidden", type=int,   default=64)
     p.add_argument("--ppo_lr",     type=float, default=2e-3)
     p.add_argument("--ppo_gamma",  type=float, default=0.99)
     p.add_argument("--ppo_log_history", action="store_true",
                     help="Keep a list of per-mini-batch rewards inside PPOEvaluator for later plotting.")
+    
+    # DPO-specific options (ignored unless --evaluator dpo)
+    p.add_argument("--dpo_beta", type=float, default=0.1,
+                   help="β temperature for DPO loss")
+    p.add_argument("--dpo_lr", type=float, default=3e-4,
+                   help="learning rate for DPO policy head")
+    p.add_argument("--dpo_hidden", type=int, default=128,
+                   help="hidden units in DPO policy MLP")
+    p.add_argument("--dpo_margin", type=float, default=0.0,
+                   help="min BEM gap to form a preference pair")
+    p.add_argument("--dpo_reference_free", action="store_true",
+                   help="run IPO (no ref‐model KL term)")
+    p.add_argument("--dpo_gpt_judge", action="store_true",
+                   help="use predictor.judge_is_better() on near‐ties")
+
     return p.parse_args()
 
 
@@ -80,6 +97,16 @@ def main() -> None:
                                  ppo_lr = args.ppo_lr,
                                  ppo_gamma = args.ppo_gamma,
                                  log_history = args.ppo_log_history)
+        
+    elif args.evaluator == "dpo":                      
+        evaluator = DPOEvaluator(eval_rounds = args.eval_rounds,
+                                 samples_per_eval = args.samples_per_eval,
+                                 dpo_hidden = args.dpo_hidden,
+                                 dpo_lr = args.dpo_lr,
+                                 dpo_beta = args.dpo_beta,
+                                 dpo_margin = args.dpo_margin,
+                                 reference_free = args.dpo_reference_free)
+
     else:
         evaluator  = get_evaluator(args.evaluator)(config)
     bf_eval    = get_evaluator("bf")(config)
