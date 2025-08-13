@@ -1,3 +1,9 @@
+**About the Project**
+This project proposes the Automatic Prompt Optimization algorithm for generative financial Question-Answering (QA) tasks. Build on the ProTeGi framework by (Pryzant et al., 2023) it implements the concept of textual Gradient Descent and beam search. Also, it incorporates Reinforcement Learning methods such as Proximal Policy Optimization (PPO) and Direct Preference Optimization (DPO). The system targets financial questions grounded in real-world financial documents/filings. The goal of the algorithm is to optimize user's prompt for the LLM in both resource and cost effective way. 
+
+
+
+
 **The Layout**
 
 | Script            | What it does                                                                                                    |
@@ -7,6 +13,7 @@
 | `optimizers.py`   | `ProTeGi` class: textual-gradient generation, MC paraphrases, beam search     .                                 |
 | `evaluators.py`   | UCB, Successive Rejects, Successive Halving, brute-force, PPO evaluators.                                       |
 | `PPO.py`          | PPO evaluator that can be used in evaluators.py                                                                 |
+| `DPO.py`          | DPO evaluator that can be used in evaluators.py                                                                 |
 | `predictors.py`   | `QA_Generator`: retrieves k chunks, fills the prompt, calls OpenAI chat.                                        |
 | `scorers.py`      | `BEMScorer` and cache system.                                                                                   |
 | `tasks.py`        | `FinanceBenchTask`: dataset splits into training/testing, BEM-driven evaluation helper.                         |
@@ -46,3 +53,5 @@
 | `--n_test_exs`             | Limits the number of test examples used during development (useful for faster debugging).                    |
 | '--max_hreads'             | Maximum number of things (e.g. prompts or examples) processed at the same time. Higher is faster (e.g. for cluster). |
 
+**References**
+ - Pryzant, R., Iter, D., Li, J., & et al. (2023). Automatic prompt optimization with "gradient descent" and beam search. arXiv preprint arXiv:2305.03495 
