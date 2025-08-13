@@ -1,8 +1,3 @@
-# DPO.py
-# ──────
-# Lightweight Direct-Preference-Optimisation trainer for
-# *discrete* action spaces (here: prompt indices).
-
 from __future__ import annotations
 import torch
 import torch.nn as nn
@@ -10,9 +5,9 @@ import torch.nn.functional as F
 from typing import List
 
 
-# ──────────────────────────────────────────────────────────────
-#  policy network (zero-state → logits[prompts])
-# ──────────────────────────────────────────────────────────────
+
+# Policy network
+
 class Policy(nn.Module):
     def __init__(self, n_actions: int, hidden: int = 128):
         super().__init__()
@@ -24,7 +19,7 @@ class Policy(nn.Module):
         # cached dummy zero-state
         self.register_buffer("_state", torch.zeros(1, n_actions))
 
-    # raw logits (shape == [n_actions])
+    # raw logits (shape = n_actions)
     def forward(self) -> torch.Tensor:
         return self.actor(self._state).squeeze(0)
 
@@ -36,9 +31,9 @@ class Policy(nn.Module):
         return self.forward().softmax(-1)
 
 
-# ──────────────────────────────────────────────────────────────
-#  preference loss  (Eq. 2 in the DPO paper)
-# ──────────────────────────────────────────────────────────────
+
+#  Preference loss 
+
 def preference_loss(
     chosen_logp: torch.Tensor,
     rejected_logp: torch.Tensor,
@@ -56,15 +51,15 @@ def preference_loss(
                                               torch.ones_like(logits))
 
 
-# ──────────────────────────────────────────────────────────────
-#  trainer wrapper (API matches PPO class)
-# ──────────────────────────────────────────────────────────────
+
+#  trainer wrapper 
+
 class DPO:
-    """
-    Discrete-action DPO trainer.
-    • `update(winners, losers)`  – single SGD step
-    • `get_action_preferences()` – returns πθ(a) as 1-D tensor
-    """
+    
+   # Discrete-action DPO trainer.
+    # update(winners, losers)  – single SGD step
+    # get_action_preferences() – returns πθ(a) as 1-D tensor
+    
 
     def __init__(self,
                  n_actions: int,
@@ -83,7 +78,7 @@ class DPO:
         w = torch.tensor(winners)
         l = torch.tensor(losers)
 
-        logp = self.policy.log_probs()              # shape [N]
+        logp = self.policy.log_probs()             
 
         if self.reference_free:
             ref_logp = torch.zeros_like(logp)
@@ -107,3 +102,4 @@ class DPO:
     # softmax over actions – used for beam pruning
     def get_action_preferences(self) -> torch.Tensor:
         return self.policy.probs()
+
