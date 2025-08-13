@@ -6,32 +6,6 @@ from utils import wrap_prompt
 import re
 
 
-# LOGGER
-
-import logging
-import os
-
-# create a logger for this module
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-
-# ensure output directory exists
-out_dir = os.path.dirname(os.environ.get("PROTEGI_DEBUG_LOG", "")) or "."
-os.makedirs(out_dir, exist_ok=True)
-
-# file handler writes debug logs here
-log_path = os.path.join(out_dir, "expand_debug.log")
-fh = logging.FileHandler(log_path, mode="w", encoding="utf-8")
-fh.setLevel(logging.DEBUG)
-
-# nice timestamped format
-formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
-fh.setFormatter(formatter)
-
-# attach to our logger
-logger.addHandler(fh)
-
-
 class PromptOptimizer(ABC):
     def __init__(self, args, evaluator_fn, scorer, max_threads=1, bf_eval=None):
         self.opt = args
@@ -168,15 +142,7 @@ class ProTeGi(PromptOptimizer):
             new_task_sections = []
             if self.opt["n_gradients"] > 0:
                 gradients = self.get_gradients(prompt, task_section, minibatch, preds)
-                    # ---- DEBUG #1: print out what the LLM said went wrong ----
-                logger.debug(">>> GRADIENTS RETURNED:")
-                for idx, (feedback, err_str) in enumerate(gradients, start=1):
-                    # precompute the escaped version
-                    fb = feedback.replace('\n', '\\n')
-                    es = err_str.replace('\n', '\\n')
-                    logger.debug(f"Gradient {idx} feedback={fb}")
-                    logger.debug(f"Gradient {idx} err_str ={es}")
-                logger.debug(">>> end gradients")
+            
                 for feedback, err_str in gradients:
                     tmp = self.apply_gradient(task_section, err_str, feedback, self.opt["steps_per_gradient"])
                     new_task_sections += tmp
@@ -190,13 +156,6 @@ class ProTeGi(PromptOptimizer):
                     syns = self.generate_synonyms(sect, n=self.opt["mc_samples_per_step"])
                     mc_sampled += syns
 
-                    # ---- DEBUG #2: print out the paraphrases you got ----
-                    sec = sect.replace('\n','\\n')
-                    logger.debug(f"<<< MC PARAPHRASES for section: {sec}")
-                    for i, s in enumerate(syns,1):
-                        syn = s.replace('\n','\\n')
-                        logger.debug(f"   Synonym {i}: {syn}")
-                    logger.debug(">>> end MC paraphrases")
 
             # combine
             new_sections = list(set(new_task_sections + mc_sampled))
@@ -226,16 +185,6 @@ class ProTeGi(PromptOptimizer):
 
             tmp_prompts = [ rebuild(prompt, s) for s in new_sections ]
 
-            # ---- DEBUG: dump out each new candidate’s Task section ----
-            logger.debug(f"=== expand_candidates (prompt #{prompts.index(prompt)+1}) ===")
-            ts_escaped = task_section.replace('\n','\\n')
-            logger.debug(f"Seed Task section: {ts_escaped}")
-            logger.debug(f"Produced {len(tmp_prompts)} candidates.")
-            for i, cand in enumerate(tmp_prompts, start=1):
-                sects = utils.parse_sectioned_prompt(cand)
-                ts    = sects.get("task","").replace("\n","\\n")
-                logger.debug(f"[{i:2d}] TASK: {ts}")
-            logger.debug("=== end expand debug ===")
 
             # optional filtering (the original much longer code but with BEM it woul me the call much more costly)
             if len(tmp_prompts) > self.opt["max_expansion_factor"]:
@@ -266,7 +215,7 @@ class ProTeGi(PromptOptimizer):
             return [self.scorer(sample, wrapped[0])]
 
         return self.evaluator_fn(
-            wrapped,                 # ← always valid
+            wrapped,                 #  always valid
             train_exs,
             task,
             predictor,
@@ -276,3 +225,4 @@ class ProTeGi(PromptOptimizer):
             samples_per_eval=self.opt["samples_per_eval"],
             max_threads=self.max_threads,
         )
+
