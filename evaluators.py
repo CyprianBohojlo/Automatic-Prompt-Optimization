@@ -246,12 +246,8 @@ class PPOEvaluator:
     
 
 class DPOEvaluator:
-    """
-    Scores prompts with Direct-Preference-Optimisation.
-    Needs:
-        • predictor.inference(ex, prompt)   – one ex / one prompt
-        • scorer.pair_prob(pred, gold, q)   – 0-1 equivalence prob
-    """
+    
+    # Uses DPO to score prompts 
 
     def __init__(
         self,
@@ -266,16 +262,16 @@ class DPOEvaluator:
     ):
         self.eval_rounds = eval_rounds
         self.samples_per_eval = samples_per_eval
-        self.margin_tau = dpo_margin          # min win-gap
+        self.margin_tau = dpo_margin          
         self.dpo = DPO(
-            n_actions      = 1,               # will be resized lazily
+            n_actions      = 1,               # will be resized 
             beta           = dpo_beta,
             lr             = dpo_lr,
             hidden         = dpo_hidden,
             reference_free = reference_free,
         )
 
-    # ──────────────────────────────────────────────────────────
+  
     def __call__(self, prompts, examples, task, predictor, scorer, **_):
         N = len(prompts)
 
@@ -294,10 +290,10 @@ class DPOEvaluator:
             winners, losers = [], []
 
             for ex in batch:
-                # 1️⃣ get one prediction per prompt
+                # get one prediction per prompt
                 preds = [predictor.inference(ex, p) for p in prompts]
 
-                # 2️⃣ turn them into BEM scores
+                # turn them into BEM scores
                 scores = [
                     scorer.pair_prob(pred, ex["answer"], ex["question"])
                     for pred in preds
@@ -308,13 +304,13 @@ class DPOEvaluator:
                 l = random.choice(l_choices)                    # random loser
 
                 if scores[w] - scores[l] < self.margin_tau:
-                    continue                                    # skip near-ties
+                    continue                                    # skip close-ties
                 winners.append(w); losers.append(l)
 
             if winners:
                 self.dpo.update(winners, losers)
 
-        # πθ(a) – higher = better
+        # πθ(a) – higher is better
         return self.dpo.get_action_preferences().tolist()
 
 
@@ -332,4 +328,5 @@ def get_evaluator(name):
         return PPOEvaluator
     if name == "dpo":
         return DPOEvaluator
+
     raise ValueError(f"Unknown evaluator: {name}")
