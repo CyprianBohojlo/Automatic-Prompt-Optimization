@@ -94,13 +94,11 @@ def instructGPT_logprobs(prompt, temperature=0.7):
 
 
 def wrap_prompt(prompt: str) -> str:
-    """
-    Guarantee that the returned string contains both `{question}` and
-    `{context}` placeholders.  If the original already has them, it is
-    returned unchanged; otherwise we prepend a minimal header.
-    """
+    
+    # Guarantee that the returned string contains both {question} and {context} placeholders.  If the original already has them, it is returned unchanged; otherwise we prepend a minimal header.
+    
     if "{question}" in prompt and "{context}" in prompt:
-        return prompt          # nothing to do
+        return prompt          
 
     header = (
         "Question: {question}\n"
