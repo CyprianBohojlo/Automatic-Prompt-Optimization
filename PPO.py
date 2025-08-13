@@ -142,7 +142,7 @@ class PPO:
 
     @torch.no_grad()
     def get_action_preferences(self):
-        # Return *probabilities* for the dummy zero-state.
+        # Return probabilities for the dummy zero-state.
         # Useful for ranking prompts without extra sampling noise.
         
         zero_state = torch.zeros(1, dtype=torch.float32, device=device)
@@ -150,11 +150,12 @@ class PPO:
         return probs.squeeze(0).cpu().numpy()
 
     def save(self, path: str):
-        """Save trainable policy parameters to *path*."""
+        # Save trainable policy parameters to path
         torch.save(self.policy.state_dict(), path)
 
     def load(self, path: str):
-        """Load parameters from *path* into both actor/critic copies."""
+        # Load parameters from path into both actor/critic copies
         sd = torch.load(path, map_location=device)
         self.policy.load_state_dict(sd)
+
         self.policy_old.load_state_dict(sd)
