@@ -9,7 +9,7 @@ import threading
 
 
 class GPT4Predictor(ABC):
-    """Minimal interface every predictor must implement."""
+    # Minimal interface every predictor must implement
 
     def __init__(self, opt: Dict | None = None):
         self.opt = opt or {}
@@ -85,4 +85,5 @@ class QA_Generator(GPT4Predictor):
         filled_prompt = prompt.format(question=ex["question"], context=ctx)
         answer = utils.chatgpt(filled_prompt, temperature=0.0, n=1, timeout=15)[0]
         return answer.strip()
+
 
