@@ -3,8 +3,9 @@
 This project proposes the Automatic Prompt Optimization algorithm for generative financial Question-Answering (QA) tasks. Build on the ProTeGi framework by (Pryzant et al., 2023) it implements the concept of textual Gradient Descent and beam search. Also, it incorporates Reinforcement Learning methods such as Proximal Policy Optimization (PPO) and Direct Preference Optimization (DPO). The system targets financial questions grounded in real-world financial documents/filings. The goal of the algorithm is to optimize user's prompt for the LLM. It aims to increase LLM’s performance with minimal resources (in terms of cost and computational power).
 
 **Example Use Case**
+```bash
 main.py --data_dir "C:\Users\Desktop\data" --prompts "C:\Users\Desktop\seed_prompt.txt"  --out "C:\Users\experimental_run_logs" --rounds 6 --beam_size 4 --eval_rounds 3 --eval_prompts_per_round 6 --samples_per_eval 36 --evaluator ppo --temperature 0.3 --top_k 2 
-
+```
 
 **The Layout**
 
