@@ -22,12 +22,12 @@ BEM_TAG = "google/bert/tensorFlow2/answer-equivalence-bem"
 def load_bem():
     base_dir = kagglehub.model_download(BEM_TAG)
 
-    # first try the cache root
+    #  first try the cache root
     root_pb = os.path.join(base_dir, "saved_model.pb")
     if os.path.exists(root_pb):
         return tf.saved_model.load(base_dir)
 
-    # otherwise go back to a nested “model/” folder 
+    # otherwise fall back to a nested “model/” folder (old layout)
     nested_dir = os.path.join(base_dir, "model")
     if os.path.exists(os.path.join(nested_dir, "saved_model.pb")):
         return tf.saved_model.load(nested_dir)
@@ -44,10 +44,10 @@ BEM_threshold   = 0.56
 
 
 def predict_on_example(inputs):
-    
-    # Worker helper for concurrent evaluation.
-    # Returns: (prompt_text, example_dict, LLM_prediction_string)
-    
+    """
+    Worker helper for concurrent evaluation.
+    Returns: (prompt_text, example_dict, LLM_prediction_string)
+    """
     ex, predictor, prompt = inputs
     pred = predictor.inference(ex, prompt)
     return prompt, ex, pred
@@ -55,9 +55,10 @@ def predict_on_example(inputs):
 
 
 class BaseScorer(ABC):
-    
-    # Implements a prompt-hash and example-id, prediction cache so the optimiser never calls the LLM twice for the same pair
-    
+    """
+    Implements a prompt-hash and example-id, prediction cache so the
+    optimiser never calls the LLM twice for the same pair.
+    """
 
     def __init__(self, predictor):
         self.predictor = predictor
@@ -122,6 +123,54 @@ class BEMScorer(BaseScorer):
             logits = list(logits.values())[0]
         prob_equiv = tf.nn.softmax(logits, axis=-1).numpy().squeeze()[1]
         return float(prob_equiv)
+    
+    # scorers.py
+    def batch_pair_prob(self, preds: list[str], golds: list[str], questions: list[str]) -> list[float]:
+        """
+        Vectorized BEM: one SavedModel call for the whole mini-batch.
+        IMPORTANT: the SavedModel expects shape (None, 512) for both inputs.
+        """
+
+
+        # 1) tokenize with fixed length 512
+        enc = BEM_tokenizer(
+            preds,
+            golds,
+            truncation=True,
+            max_length=512,
+            padding="max_length",          # ← pad to 512, not to longest
+            return_tensors="tf",
+        )
+
+        # Some tokenizers may omit token_type_ids; ensure it exists
+        if "token_type_ids" not in enc:
+            # make a zeros segment_ids tensor with the exact same shape
+            seg = tf.zeros_like(enc["input_ids"], dtype=tf.int64)
+        else:
+            seg = tf.cast(enc["token_type_ids"], tf.int64)
+
+        # 2) cast to int64 and enforce exact (B, 512) shapes
+        input_ids = tf.cast(enc["input_ids"], tf.int64)
+        # Optional (helps with static tracing)
+        input_ids = tf.ensure_shape(input_ids, [None, 512])
+        seg       = tf.ensure_shape(seg,       [None, 512])
+
+        inputs = {"input_ids": input_ids, "segment_ids": seg}
+
+        # 3) forward
+        with _BEM_LOCK:
+            logits = BEM_MODEL(inputs)
+            # Some TF SavedModels return dicts; normalize to a tensor
+            if isinstance(logits, dict):
+                # take the first (only) output
+                logits = next(iter(logits.values()))
+
+        # 4) convert to probability that pred ≡ gold (class 1)
+        prob_equiv = tf.nn.softmax(logits, axis=-1).numpy()[:, 1]
+        return prob_equiv.tolist()
+
+
+
 
     def pair_equivalent(self, pred: str, gold: str, question: str) -> bool:
         return self.pair_prob(pred, gold, question) >= self.tau
@@ -133,4 +182,3 @@ class BEMScorer(BaseScorer):
             for p, ex in zip(preds, examples)
         ]
         return float(np.mean(hits))
-

@@ -7,7 +7,9 @@ import concurrent.futures
 import requests
 from PPO import PPO, Memory
 from DPO import DPO
-
+import numpy as np
+import random
+import torch
 
 
 def _score_prompts(scorer, prompts, examples):
@@ -214,6 +216,7 @@ class PPOEvaluator:
         self.gamma = ppo_gamma
         self.log_history = log_history
         self.rewards_history = []
+        self.rewards_full_history = []
 
     def reward(self, prompt, examples, scorer):
         return scorer(examples, prompt) # Returns mean accuracy
@@ -231,9 +234,15 @@ class PPOEvaluator:
         for _ in range(self.eval_rounds):
             idx = ppo.select_action(None, memory)
             batch = random_number.sample(train_pool, self.samples_per_eval)
-            rew = self.reward(prompts[idx], batch, scorer)
+            #rew = self.reward(prompts[idx], batch, scorer)  Old version without full hsitory 
+            # --- compute per-example 0/1 hits, then the mean for training ---
+            preds = scorer._predict(batch, prompts[idx])   # uses cache
+            hits = [1.0 if scorer.pair_equivalent(p, ex["answer"], ex["question"]) else 0.0
+                    for p, ex in zip(preds, batch)]
+            rew = sum(hits) / len(hits)
             if self.log_history:
                 self.rewards_history.append(rew) # Save rewards hisotry so we can plot it later
+                self.rewards_full_history.append(hits)
             # store transition & update immediately 
             memory.rewards.append(rew)
             memory.is_terminals.append(True)
@@ -246,72 +255,195 @@ class PPOEvaluator:
     
 
 class DPOEvaluator:
-    
-    # Uses DPO to score prompts 
+    """
+    Scores prompts with Direct-Preference-Optimisation.
+
+    Expects:
+      - scorer._predict(batch, prompt)  -> list[str]  (batched, cached LLM outputs)
+      - scorer.pair_prob(pred, gold, q) -> float in [0,1]
+      - (optional) scorer.batch_pair_prob(preds, golds, questions) -> list[float] (vectorized BEM)
+
+    History (one entry per DPO update):
+      self.history = {
+        "loss": [],      # DPO preference loss
+        "pairs": [],     # # of (w,l) pairs used
+        "margin": [],    # mean winner-loser BEM gap
+        "entropy": [],   # H(pi) after update
+        "exp_prob": [],  # E_{a~pi}[BEM] on the active set
+        "kl_ref": [],    # KL(pi || pi_ref) if anchored, else None
+      }
+    """
 
     def __init__(
         self,
         eval_rounds: int = 50,
         samples_per_eval: int = 16,
-        dpo_hidden: int = 128,
+        dpo_hidden: int = 128,        # kept for CLI compat; not used by current logits-only policy
         dpo_lr: float = 3e-4,
         dpo_beta: float = 0.1,
         dpo_margin: float = 0.0,
         reference_free: bool = False,
         **_
     ):
+
         self.eval_rounds = eval_rounds
         self.samples_per_eval = samples_per_eval
-        self.margin_tau = dpo_margin          
+        self.margin_tau = dpo_margin
+
         self.dpo = DPO(
-            n_actions      = 1,               # will be resized 
-            beta           = dpo_beta,
-            lr             = dpo_lr,
-            hidden         = dpo_hidden,
-            reference_free = reference_free,
+            n_actions=1,                # lazily resized on first call
+            beta=dpo_beta,
+            lr=dpo_lr,
+            hidden=dpo_hidden,          # ignored by logits-only Policy but kept for API compat
+            reference_free=reference_free,
         )
 
-  
-    def __call__(self, prompts, examples, task, predictor, scorer, **_):
-        N = len(prompts)
+        # logging buffers
+        self.history = {
+            "loss": [],
+            "pairs": [],
+            "margin": [],
+            "entropy": [],
+            "exp_prob": [],
+            "kl_ref": [],
+        }
 
-        # grow / shrink the policy head if beam size changes
-        if N != self.dpo.policy.actor[-1].out_features:
+    def _build_scores_matrix(self, scorer, batch, active_prompts, all_preds):
+        """
+        Returns scores_mat of shape (B, N_active), where entry (j,i) is
+        BEM probability that all_preds[i][j] is equivalent to gold for example j.
+        Uses scorer.batch_pair_prob if available; falls back to per-example pair_prob.
+        """
+
+        B = len(batch)
+        N_active = len(active_prompts)
+
+        golds = [ex["answer"] for ex in batch]
+        qs    = [ex["question"] for ex in batch]
+
+        # Fast path: vectorized BEM per prompt (one call per column)
+        if hasattr(scorer, "batch_pair_prob"):
+            cols = []
+            for i in range(N_active):
+                probs = scorer.batch_pair_prob(all_preds[i], golds, qs)  # len B
+                cols.append(np.asarray(probs, dtype=np.float32))
+            scores_mat = np.stack(cols, axis=1)  # (B, N_active)
+            return scores_mat
+
+        # Fallback: per-example calls
+        scores_mat = np.empty((B, N_active), dtype=np.float32)
+        for i in range(N_active):
+            for j in range(B):
+                scores_mat[j, i] = float(
+                    scorer.pair_prob(all_preds[i][j], golds[j], qs[j])
+                )
+        return scores_mat
+
+    def __call__(
+        self,
+        prompts,
+        examples,
+        task,
+        predictor,
+        scorer,
+        num_prompts_per_round=None,
+        **_,
+    ):
+
+
+        N_total = len(prompts)
+
+        # Resize policy head if the number of actions changed
+        if N_total != self.dpo.policy.logits.numel():
+            from DPO import DPO
             self.dpo = DPO(
-                n_actions      = N,
-                beta           = self.dpo.beta,
-                lr             = self.dpo.optimizer.param_groups[0]["lr"],
-                hidden         = self.dpo.policy.actor[0].in_features,
-                reference_free = self.dpo.reference_free,
+                n_actions=N_total,
+                beta=self.dpo.beta,
+                lr=self.dpo.optimizer.param_groups[0]["lr"],
+                reference_free=self.dpo.reference_free,
             )
 
         for _ in range(self.eval_rounds):
+            # Sample a mini-batch of examples
             batch = random.sample(examples, k=self.samples_per_eval)
-            winners, losers = [], []
+            B = len(batch)
 
-            for ex in batch:
-                # get one prediction per prompt
-                preds = [predictor.inference(ex, p) for p in prompts]
+            # Sample an active subset of prompts for this iteration
+            if (num_prompts_per_round is not None) and (num_prompts_per_round < N_total):
+                active_idx = random.sample(range(N_total), k=num_prompts_per_round)
+            else:
+                active_idx = list(range(N_total))
+            active_prompts = [prompts[i] for i in active_idx]
+            N_active = len(active_prompts)
 
-                # turn them into BEM scores
-                scores = [
-                    scorer.pair_prob(pred, ex["answer"], ex["question"])
-                    for pred in preds
-                ]
+            # Batched, cached LLM predictions: one list per active prompt
+            all_preds = [scorer._predict(batch, p) for p in active_prompts]  # len N_active, each len B
 
-                w = int(max(range(N), key=scores.__getitem__))   # best prompt
-                l_choices = [i for i in range(N) if i != w]
-                l = random.choice(l_choices)                    # random loser
+            # Build BEM score matrix once, reuse it
+            scores_mat = self._build_scores_matrix(scorer, batch, active_prompts, all_preds)  # (B, N_active)
 
-                if scores[w] - scores[l] < self.margin_tau:
-                    continue                                    # skip close-ties
-                winners.append(w); losers.append(l)
+            # Winner/loser mining (hard negative) with margin filtering
+            winners, losers, margins = [], [], []
+            row_argmax = scores_mat.argmax(axis=1)  # best per example in ACTIVE set
+            for j in range(B):
+                w_local = int(row_argmax[j])
+                row = scores_mat[j]
 
-            if winners:
-                self.dpo.update(winners, losers)
+                if N_active < 2:
+                    continue  # cannot form a pair with 1 prompt
 
-        # πθ(a) – higher is better
+                # pick the best loser (2nd-best in the row)
+                # argpartition is O(N), safer for larger N_active
+                part = np.argpartition(row, -2)[-2:]
+                # ensure loser != winner
+                if w_local in part:
+                    l_local = int(part[0] if part[1] == w_local else part[1])
+                else:
+                    # fallback if argpartition didn't include winner (edge case)
+                    l_local = int(part[0])
+
+                gap = float(row[w_local] - row[l_local])
+                if gap < self.margin_tau:
+                    continue
+
+                # map back to GLOBAL indices for the policy head
+                winners.append(active_idx[w_local])
+                losers.append(active_idx[l_local])
+                margins.append(gap)
+
+            if not winners:
+                continue  # nothing to update on this iteration
+
+            # One DPO update; returns preference loss
+            loss = float(self.dpo.update(winners, losers))
+
+            # Policy diagnostics (AFTER the update)
+            with torch.no_grad():
+                logits = self.dpo.policy.logits            # (N_total,)
+                logp   = logits.log_softmax(-1)
+                p      = logp.exp()
+                entropy = float(-(p * logp).sum().item())
+
+                kl_ref = None
+                if (not self.dpo.reference_free) and (self.dpo._ref_logits is not None):
+                    logp_ref = self.dpo._ref_logits.log_softmax(-1)
+                    kl_ref = float((p * (logp - logp_ref)).sum().item())
+
+            # Policy-expected BEM prob on the ACTIVE set for this batch
+            p_active = p[active_idx].cpu().numpy()  # (N_active,)
+            exp_prob = float((scores_mat @ p_active).mean())
+
+            # Log history
+            self.history["loss"].append(loss)
+            self.history["pairs"].append(len(winners))
+            self.history["margin"].append(float(np.mean(margins)) if margins else None)
+            self.history["entropy"].append(entropy)
+            self.history["exp_prob"].append(exp_prob)
+            self.history["kl_ref"].append(kl_ref)
+
+        # Return πθ(a) for ranking outside
         return self.dpo.get_action_preferences().tolist()
+
 
 
 def get_evaluator(name):
@@ -328,5 +460,4 @@ def get_evaluator(name):
         return PPOEvaluator
     if name == "dpo":
         return DPOEvaluator
-
     raise ValueError(f"Unknown evaluator: {name}")
