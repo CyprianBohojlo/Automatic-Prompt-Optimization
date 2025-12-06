@@ -48,21 +48,32 @@ def process_example(ex: Dict, predictor, prompt):
 
 class FinanceBenchTask(DataProcessor):
     SPLIT_FILE = "financebench_split.json"
+    DATA_FILE = "dataset_prepared.parquet"
+    QUESTION_COLUMN = "question"
+    ANSWER_COLUMN = "answer"
+    DOCNAME_COLUMN = "doc_name"
+    SPLIT_COLUMN = None
+    TRAIN_SPLITS = ("train",)
+    TEST_SPLITS = ("test",)
 
     def __init__(self, data_dir: str, max_threads: int = 4, seed: int = 42):
         super().__init__(data_dir, max_threads)
         self.seed = seed
-        self.df: pd.DataFrame = pd.read_parquet(
-            pathlib.Path(data_dir) / "dataset_prepared.parquet"
-        )
-        self.train_idx, self.test_idx = self._load_or_make_split()
+        data_path = pathlib.Path(data_dir) / self.DATA_FILE
+        self.df: pd.DataFrame = pd.read_parquet(data_path)
 
-        # Random shuffle, can be removed
+        if self.SPLIT_COLUMN:
+            split_series = self.df[self.SPLIT_COLUMN].fillna("")
+            train_mask = split_series.isin(self.TRAIN_SPLITS)
+            test_mask = split_series.isin(self.TEST_SPLITS)
+            self.train_idx = split_series[train_mask].index.tolist()
+            self.test_idx = split_series[test_mask].index.tolist()
+        else:
+            self.train_idx, self.test_idx = self._load_or_make_split()
+
         random.Random(self.seed).shuffle(self.train_idx)
-
         self.bem_scorer = BEMScorer(None, bem_threshold=0.56)
 
-    # Making a split 80/20 if it's not already loaded
     def _load_or_make_split(self):
         path = pathlib.Path(self.data_dir) / self.SPLIT_FILE
         if path.exists():
@@ -70,7 +81,7 @@ class FinanceBenchTask(DataProcessor):
                 split = json.load(f)
             return split["train"], split["test"]
 
-        idx = list(range(len(self.df)))
+        idx = list(self.df.index) # before: list(range(len(self.df)))
         random.Random(self.seed).shuffle(idx)
         k = int(0.8 * len(idx))
         split = {"train": idx[:k], "test": idx[k:]}
@@ -79,15 +90,14 @@ class FinanceBenchTask(DataProcessor):
             json.dump(split, f)
         return split["train"], split["test"]
 
-    
     def _idx_to_examples(self, idxs):
-        sub = self.df.iloc[idxs]
+        sub = self.df.loc[idxs]
         return [
             {
-                "id":       int(i),
-                "question": r.question,
-                "answer":   r.answer,
-                "doc_name": r.doc_name,        
+                "id": int(i),
+                "question": r[self.QUESTION_COLUMN],
+                "answer": r[self.ANSWER_COLUMN],
+                "doc_name": r[self.DOCNAME_COLUMN],
             }
             for i, r in sub.iterrows()
         ]
@@ -97,7 +107,22 @@ class FinanceBenchTask(DataProcessor):
 
     def get_test_examples(self):
         return self._idx_to_examples(self.test_idx)
-    
+
+
+class FinderTask(FinanceBenchTask):
+    SPLIT_FILE = "finder_split.json"
+
+
+class DocFinQATask(FinanceBenchTask):
+    SPLIT_FILE = "docfinqa_split.json"
+    SPLIT_COLUMN = "split"
+    TRAIN_SPLITS = ("train",)
+    TEST_SPLITS = ("test",)
+
+
+class FindocTask(FinanceBenchTask):
+    SPLIT_FILE = "findoc_split.json"
+
 
     # Evaluation using the BEM method
     def run_evaluate(self, predictor, prompt, examples: List[Dict], n: int | None = None) -> float:
@@ -127,6 +152,13 @@ class FinanceBenchTask(DataProcessor):
 
 # Later used in main.py
 def get_task(task_name: str, data_root: str, **kw) -> FinanceBenchTask:
-    if task_name.lower() != "financebench":
-        raise ValueError("Only FinanceBench is supported in this fork.")
-    return FinanceBenchTask(data_root, **kw)
+    name = task_name.lower()
+    mapping = {
+        "financebench": FinanceBenchTask,
+        "finder": FinderTask,
+        "docfinqa": DocFinQATask,
+        "findoc": FindocTask,
+    }
+    if name not in mapping:
+        raise ValueError(f"Unsupported task {task_name}")
+    return mapping[name](data_root, **kw)
