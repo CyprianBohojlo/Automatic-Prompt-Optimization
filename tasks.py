@@ -108,6 +108,30 @@ class FinanceBenchTask(DataProcessor):
     def get_test_examples(self):
         return self._idx_to_examples(self.test_idx)
 
+    # Evaluation using the BEM method
+    def run_evaluate(self, predictor, prompt, examples: List[Dict], n: int | None = None) -> float:
+        exs = examples if n is None else examples[:n]
+
+        texts = []
+        labels = []
+        preds = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_threads) as pool:
+            futures = [pool.submit(process_example, ex, predictor, prompt) for ex in exs]
+
+            for ex, pred in tqdm((f.result() for f in futures), total=len(futures), desc="BEM eval"):
+                texts.append(ex["question"])
+                labels.append(ex["answer"])
+                preds.append(pred)
+
+        hits = sum(
+            self.bem_scorer.pair_equivalent(p, g, q)
+            for p, g, q in zip(preds, labels, texts)
+        )
+        return hits / len(exs)
+
+    def evaluate(self, predictor, prompt, examples, n=None):
+        return self.run_evaluate(predictor, prompt, examples, n)
+
 
 class FinderTask(FinanceBenchTask):
     SPLIT_FILE = "finder_split.json"
@@ -122,32 +146,6 @@ class DocFinQATask(FinanceBenchTask):
 
 class FindocTask(FinanceBenchTask):
     SPLIT_FILE = "findoc_split.json"
-
-
-    # Evaluation using the BEM method
-    def run_evaluate(self, predictor, prompt, examples: List[Dict], n: int | None = None) -> float:
-        exs = examples if n is None else examples[:n]
-
-        texts = []
-        labels = []
-        preds = []       
-        with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_threads) as pool:
-            futures = [pool.submit(process_example, ex, predictor, prompt) for ex in exs]
-
-            for ex, pred in tqdm((f.result() for f in futures), total=len(futures), desc="BEM eval"):
-                texts.append(ex["question"])
-                labels.append(ex["answer"])
-                preds.append(pred)
-
-        # BEM scoring loop 
-        hits = sum(
-            self.bem_scorer.pair_equivalent(p, g, q)
-            for p, g, q in zip(preds, labels, texts)
-        )
-        return hits / len(exs)
-    
-    def evaluate(self, predictor, prompt, examples, n=None):
-        return self.run_evaluate(predictor, prompt, examples, n)
 
 
 # Later used in main.py
