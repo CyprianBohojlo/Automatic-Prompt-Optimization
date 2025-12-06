@@ -31,11 +31,16 @@ DEFAULT_DATA_DIRS = {
 }
 FINANCEBENCH_REF = ROOT / "references" / "FinanceBenchPdfs"
 FINANCEBENCH_REF.mkdir(parents=True, exist_ok=True)
+
+
+FINDOC_REF = ROOT / "references" / "FinDoc"
+FINDOC_REF.mkdir(parents=True, exist_ok=True)
+
 DEFAULT_REF_DIRS = {
     "financebench": FINANCEBENCH_REF,
     #"finder": pathlib.Path("C:\Users\cypri\Desktop\Master Thesis\references\Finder"),
     "docfinqa": None,
-    #"findoc": pathlib.Path("C:\Users\cypri\Desktop\Master Thesis\references\FinDoc"),
+    "findoc": FINDOC_REF,
 }
 FINANCEBENCH_VS = ROOT / "vectorstores"/ "FinanceBench"
 FINANCEBENCH_VS.mkdir(parents=True, exist_ok=True)
