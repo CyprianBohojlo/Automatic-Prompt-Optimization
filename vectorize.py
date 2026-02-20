@@ -22,7 +22,7 @@ assert os.getenv("OPENAI_API_KEY"), "API key not loaded!"
 
 
 # ---------------------------------------------------------------------
-ROOT = pathlib.Path(r"C:\Users\cypri\Desktop\Master Thesis")
+ROOT = pathlib.Path(r"/home/kelava/koh998/protegi")
 DEFAULT_DATA_DIRS = {
     "financebench": ROOT / "data" / "FinanceBench",
     "finder": ROOT / "data" / "Finder",

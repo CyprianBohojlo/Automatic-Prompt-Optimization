@@ -6,7 +6,7 @@ from typing import Iterable
 import pandas as pd
 
 
-ROOT = pathlib.Path(r"C:\Users\cypri\Desktop\Master Thesis")
+ROOT = pathlib.Path(r"/home/kelava/koh998/protegi")
 DEFAULT_DATA_DIRS = {
     "financebench": ROOT / "data" / "FinanceBench",
     "finder": ROOT / "data" / "FinDER",

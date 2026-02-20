@@ -17,7 +17,7 @@ from scorers import BEMScorer
 
 load_dotenv()
 
-ROOT     = pathlib.Path(r"C:\Users\cypri\OneDrive\Desktop\Master Thesis")
+ROOT     = pathlib.Path(r"/home/kelava/koh998/protegi")
 ANSWERS  = ROOT / "results" / "answers.jsonl"
 GRADES   = ROOT / "results" / "grades_ce.jsonl"
 
