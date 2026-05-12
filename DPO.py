@@ -1,3 +1,8 @@
+# DPO.py
+# ──────
+# Lightweight Direct-Preference-Optimisation trainer for
+# *discrete* action spaces (here: prompt indices).
+
 from __future__ import annotations
 import torch
 import torch.nn as nn
@@ -5,35 +10,46 @@ import torch.nn.functional as F
 from typing import List
 
 
+# ──────────────────────────────────────────────────────────────
+#  policy network (zero-state → logits[prompts])
+# ──────────────────────────────────────────────────────────────
+# class Policy(nn.Module):
+#     def __init__(self, n_actions: int, hidden: int = 128):
+#         super().__init__()
+#         self.actor = nn.Sequential(
+#             nn.Linear(n_actions, hidden),
+#             nn.Tanh(),
+#             nn.Linear(hidden, n_actions),
+#         )
+#         # cached dummy zero-state
+#         self.register_buffer("_state", torch.zeros(1, n_actions))
 
-# Policy network
+#     # raw logits (shape == [n_actions])
+#     def forward(self) -> torch.Tensor:
+#         return self.actor(self._state).squeeze(0)
+
+#     # helpers
+#     def log_probs(self) -> torch.Tensor:
+#         return self.forward().log_softmax(-1)
+
+#     def probs(self) -> torch.Tensor:
+#         return self.forward().softmax(-1)
+
 
 class Policy(nn.Module):
-    def __init__(self, n_actions: int, hidden: int = 128):
+    def __init__(self, n_actions):
         super().__init__()
-        self.actor = nn.Sequential(
-            nn.Linear(n_actions, hidden),
-            nn.Tanh(),
-            nn.Linear(hidden, n_actions),
-        )
-        # cached dummy zero-state
-        self.register_buffer("_state", torch.zeros(1, n_actions))
-
-    # raw logits (shape = n_actions)
-    def forward(self) -> torch.Tensor:
-        return self.actor(self._state).squeeze(0)
-
-    # helpers
-    def log_probs(self) -> torch.Tensor:
-        return self.forward().log_softmax(-1)
-
-    def probs(self) -> torch.Tensor:
-        return self.forward().softmax(-1)
+        self.logits = nn.Parameter(torch.zeros(n_actions))
+    def forward(self): return self.logits
+    def log_probs(self): return self.logits.log_softmax(-1)
+    def probs(self): return self.logits.softmax(-1)
 
 
 
-#  Preference loss 
 
+# ──────────────────────────────────────────────────────────────
+#  preference loss  (Eq. 2 in the DPO paper)
+# ──────────────────────────────────────────────────────────────
 def preference_loss(
     chosen_logp: torch.Tensor,
     rejected_logp: torch.Tensor,
@@ -51,15 +67,15 @@ def preference_loss(
                                               torch.ones_like(logits))
 
 
-
-#  trainer wrapper 
-
+# ──────────────────────────────────────────────────────────────
+#  trainer wrapper (API matches PPO class)
+# ──────────────────────────────────────────────────────────────
 class DPO:
-    
-   # Discrete-action DPO trainer.
-    # update(winners, losers)  – single SGD step
-    # get_action_preferences() – returns πθ(a) as 1-D tensor
-    
+    """
+    Discrete-action DPO trainer.
+    • `update(winners, losers)`  – single SGD step
+    • `get_action_preferences()` – returns πθ(a) as 1-D tensor
+    """
 
     def __init__(self,
                  n_actions: int,
@@ -69,16 +85,16 @@ class DPO:
                  reference_free: bool = True):
         self.beta = beta
         self.reference_free = reference_free
-        self.policy = Policy(n_actions, hidden)
+        self.policy = Policy(n_actions) # befoore it was Policy(n_actions, hidden)
         self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=lr)
         self._ref_logits = None            # frozen π_ref
 
     # single optimisation step
-    def update(self, winners: List[int], losers: List[int]) -> None:
+    def update(self, winners: List[int], losers: List[int]) -> float:
         w = torch.tensor(winners)
         l = torch.tensor(losers)
 
-        logp = self.policy.log_probs()             
+        logp = self.policy.log_probs()              # shape [N]
 
         if self.reference_free:
             ref_logp = torch.zeros_like(logp)
@@ -98,8 +114,8 @@ class DPO:
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
+        return float(loss.detach().item()) # old version didn' thave return at all
 
     # softmax over actions – used for beam pruning
     def get_action_preferences(self) -> torch.Tensor:
         return self.policy.probs()
-

@@ -30,6 +30,14 @@ def parse_args():
     p.add_argument("--max_threads", type=int, default=4)
     p.add_argument("--n_test_exs", type=int, default=None)
 
+    # RAG method
+    p.add_argument("--rag_method", choices=["neural", "sturdy"], default="neural",
+                   help="Retrieval method: 'neural' (E5+Chroma) or 'sturdy' (bulk index)")
+    p.add_argument("--doc_id_mapping", default=None,
+                   help="Path to doc_id_mapping.csv (defaults to <data_dir>/doc_id_mapping.csv)")
+    p.add_argument("--sturdy_index_name", default="bulk_train_all",
+                   help="Sturdy bulk index name")
+
     # PPO-specific options (ignored unless --evaluator ppo)
     p.add_argument("--ppo_hidden", type=int,   default=64)
     p.add_argument("--ppo_lr",     type=float, default=2e-3)
@@ -86,8 +94,16 @@ def main() -> None:
 
     task       = get_task("financebench", args.data_dir,
                           max_threads=args.max_threads)
+    # Resolve doc_id_mapping path: explicit flag, or default to <data_dir>/doc_id_mapping.csv
+    mapping_path = args.doc_id_mapping
+    if mapping_path is None and args.rag_method == "sturdy":
+        mapping_path = str(pathlib.Path(args.data_dir) / "doc_id_mapping.csv")
+
     predictor  = QA_Generator({"temperature": args.temperature,
-                               "top_k": args.top_k})
+                               "top_k": args.top_k,
+                               "rag_method": args.rag_method,
+                               "doc_id_mapping": mapping_path,
+                               "sturdy_index_name": args.sturdy_index_name})
     scorer     = BEMScorer(predictor)
 
     if args.evaluator == "ppo":

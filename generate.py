@@ -12,7 +12,7 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_openai.chat_models import ChatOpenAI
 from langchain.chains import RetrievalQA
 
-ROOT      = pathlib.Path(r"C:\Users\cypri\OneDrive\Desktop\Master Thesis")
+ROOT      = pathlib.Path(r"/home/kelava/koh998/protegi")
 DATASET   = ROOT / "data" / "dataset_prepared.parquet"
 VS_DIR    = ROOT / "vectorstores"
 RESULTS   = ROOT / "results"; RESULTS.mkdir(exist_ok=True)

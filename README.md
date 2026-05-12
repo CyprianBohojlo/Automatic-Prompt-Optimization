@@ -1,4 +1,4 @@
-**About the Project**
+# Automatic Prompt Optimization for Financial QA
 
 This project proposes the Automatic Prompt Optimization algorithm for generative financial Question-Answering (QA) tasks. Build on the ProTeGi framework by (Pryzant et al., 2023) it implements the concept of textual Gradient Descent and beam search. Also, it incorporates Reinforcement Learning methods such as Proximal Policy Optimization (PPO) and Direct Preference Optimization (DPO). The system targets financial questions grounded in real-world financial documents/filings across three datasets: **FinanceBench**, **DocFinQA**, and **FinDoc-RAG**. The goal of the algorithm is to optimize user's prompt for the LLM. It aims to increase LLM's performance with minimal resources (in terms of cost and computational power).
 
